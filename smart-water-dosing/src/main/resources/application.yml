@@ -1,0 +1,201 @@
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/water_dosing
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+        order_inserts: true
+        order_updates: true
+        batch_size: 20
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          max-age: 86400
+          cache-public: true
+      chain:
+        compressed: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: smart-water-dosing
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: 智慧水厂絮凝沉淀工艺智能加药系统
+    version: 1.0.0
+
+modbus:
+  host: 127.0.0.1
+  port: 502
+  poll:
+    interval: 300000
+  connect:
+    timeout: 3000
+  read:
+    timeout: 5000
+
+dosing:
+  model:
+    min-samples: 50
+    train-window-hours: 72
+    enable-degraded-mode: true
+    degraded-base-dose: 5.0
+    ridge-lambda: 0.01
+    base-coeff: 2.5
+    turb-coeff: 0.15
+    flow-coeff: 0.001
+    cross-coeff: 0.000005
+
+alarm:
+  outlet-turbidity-threshold: 0.5
+  outlet-duration-seconds: 600
+  flocculation-turbidity-threshold: 25.0
+
+dingtalk:
+  enabled: false
+  webhook:
+    url: https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN_HERE
+  timeout:
+    ms: 5000
+  max-retries: 3
+  retry:
+    delay:
+      ms: 1000
+  thread-pool:
+    size: 2
+
+water-distribution:
+  enabled: true
+  optimize:
+    schedule-cron: "0 0 2 * * ?"
+    target-turbidity: 15.0
+    target-ph-min: 6.5
+    target-ph-max: 8.5
+    target-ammonia: 0.5
+    target-cod: 3.0
+    population-size: 100
+    generations: 200
+    mutation-rate: 0.05
+    crossover-rate: 0.8
+    cost-weight: 0.6
+    quality-weight: 0.4
+  prediction:
+    forecast-hours: 24
+
+membrane:
+  enabled: true
+  evaluate:
+    schedule-cron: "0 0 * * * ?"
+    uf-normalized-flux-urgent: 0.7
+    uf-normalized-flux-soon: 0.75
+    uf-tmd-urgent: 0.2
+    uf-tmd-soon: 0.15
+    ro-normalized-flux-urgent: 0.7
+    ro-normalized-flux-soon: 0.75
+    ro-tmd-urgent: 1.2
+    ro-tmd-soon: 1.0
+    fouling-index-urgent: 40
+    fouling-index-soon: 30
+    trend-analysis-days: 14
+    min-clean-interval-days: 15
+
+chemical-inventory:
+  enabled: true
+  check:
+    schedule-cron: "0 30 1 * * ?"
+    forecast-days: 7
+    stock-days-urgent: 2
+    stock-days-soon: 5
+    procurement-lead-days: 3
+    safety-stock-days: 10
+  notify:
+    procurement-email: procurement@waterplant.com
+    auto-generate-requisition: true
+
+water-quality-forecast:
+  enabled: true
+  forecast:
+    schedule-cron: "0 */5 * * * ?"
+    predict-minutes-ahead: 60
+    prediction-interval-minutes: 5
+    turbidity-limit: 1.0
+    residual-chlorine-min: 0.3
+    residual-chlorine-max: 0.5
+    confidence-threshold: 0.8
+    arima:
+      p: 2
+      d: 1
+      q: 1
+      seasonal-p: 1
+      seasonal-d: 1
+      seasonal-q: 1
+    notification:
+      enable-warning-alert: true
+      enable-caution-alert: true
+      pre-warning-minutes: 10
+
+scheduler:
+  advanced-features:
+    enabled: true
+
+logging:
+  level:
+    com.water.dosing: INFO
+    org.hibernate.SQL: WARN
+    reactor.netty: WARN
+    com.water.dosing.optimizer: DEBUG
+    com.water.dosing.predictor: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

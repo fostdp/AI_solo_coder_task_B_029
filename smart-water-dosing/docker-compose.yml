@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  timescaledb:
+    build:
+      context: .
+      dockerfile: timescaledb/Dockerfile
+    container_name: water-timescaledb
+    environment:
+      POSTGRES_DB: water_dosing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d water_dosing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - water-net
+
+  modbus-simulator:
+    build:
+      context: ./modbus-simulator
+      dockerfile: Dockerfile
+    container_name: water-modbus-sim
+    environment:
+      LISTEN_HOST: "0.0.0.0"
+      LISTEN_PORT: "502"
+      UPDATE_INTERVAL: "300"
+      RAW_TURBIDITY: "18.0"
+      RAW_PH: "7.1"
+      RAW_TEMPERATURE: "18.0"
+      RAW_FLOW_RATE: "8333"
+      FLUCT_TURBIDITY: "2.0"
+      FLUCT_PH: "0.1"
+      FLUCT_TEMPERATURE: "0.5"
+      FLUCT_FLOW_RATE: "200"
+      FLOCCULATION_TURB_RATIO: "0.5"
+      SEDIMENTATION_TURB_RATIO: "0.12"
+      FILTRATION_TURB_RATIO: "0.02"
+      OUTLET_TURB_RATIO: "0.015"
+    ports:
+      - "502:502"
+    depends_on: []
+    restart: unless-stopped
+    networks:
+      - water-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: water-app
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://timescaledb:5432/water_dosing"
+      SPRING_DATASOURCE_USERNAME: "postgres"
+      SPRING_DATASOURCE_PASSWORD: "postgres"
+      MODBUS_HOST: "modbus-simulator"
+      MODBUS_PORT: "502"
+      MODBUS_POLL_INTERVAL: "300000"
+      DINGTALK_ENABLED: "false"
+      DINGTALK_WEBHOOK_URL: ""
+      DOSING_MODEL_MIN_SAMPLES: "50"
+      DOSING_MODEL_TRAIN_WINDOW_HOURS: "72"
+      DOSING_MODEL_ENABLE_DEGRADED_MODE: "true"
+      DOSING_MODEL_RIDGE_LAMBDA: "0.01"
+      ALARM_OUTLET_TURBIDITY_THRESHOLD: "0.5"
+      ALARM_OUTLET_DURATION_SECONDS: "600"
+      ALARM_FLOCCULATION_TURBIDITY_THRESHOLD: "25.0"
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    ports:
+      - "8080:8080"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      modbus-simulator:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    networks:
+      - water-net
+
+volumes:
+  timescaledb_data:
+
+networks:
+  water-net:
+    driver: bridge
